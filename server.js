@@ -37,13 +37,12 @@ setupChatSockets(io);
 
 
 const PORT = env.PORT || 4000;
-const HOST = "0.0.0.0";
 
 (async () => {
   try {
     await connectToDataBase();
-    server.listen(PORT,HOST, () => {
-      console.log(`Server running on port http://${HOST}:${PORT}`);
+    server.listen(PORT, () => {
+      console.log(`Server running on port http://localhost:${PORT}`);
     });
   } catch (err) {
     console.error('Failed to start server:', err);
