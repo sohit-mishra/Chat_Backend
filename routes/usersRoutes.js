@@ -4,10 +4,16 @@ const userController = require("../controllers/userController");
 const auth = require("../middleware/auth");
 const multer = require("multer");
 
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ storage: multer.memoryStorage() });
+
 router.get("/me", auth, userController.getMyProfile);
-router.put("/me/update", auth, upload.single("avatar"), userController.updateProfile);
+router.put(
+  "/update/profile",
+  auth,
+  upload.single("file"),
+  userController.updateProfilePhoto
+);
 router.get("/", auth, userController.getAllUsers);
-router.get("/:id", auth, userController.getUserById);
+router.put("/update", auth, userController.getUserByUpdate);
 
 module.exports = router;
