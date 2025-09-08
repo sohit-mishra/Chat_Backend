@@ -24,6 +24,25 @@ function setupChatSockets(io) {
     onlineUsers.set(socket.userId, socket.id);
     io.emit("users:online", Array.from(onlineUsers.keys()));
 
+    socket.on("messages:get", async ({ to }) => {
+      try {
+        let conversation = await Conversation.findOne({
+          participants: { $all: [socket.userId, to] },
+        });
+
+        if (!conversation) {
+
+          return socket.emit("messages:list", { to, messages: [] });
+        }
+
+        const messages = await Message.find({ conversation: conversation._id })
+          .sort({ createdAt: 1 });
+
+        socket.emit("messages:list", { to, messages });
+      } catch (err) {
+        console.error("messages:get error", err);
+      }
+    });
 
     socket.on("typing:start", ({ to }) => {
       if (onlineUsers.has(to)) {
@@ -36,7 +55,6 @@ function setupChatSockets(io) {
         io.to(onlineUsers.get(to)).emit("typing:stop", { from: socket.userId });
       }
     });
-
 
     socket.on("message:send", async ({ to, text }) => {
       try {

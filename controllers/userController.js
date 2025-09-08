@@ -1,12 +1,12 @@
 const User = require("../models/User");
 const ImageKit = require("imagekit");
 const env = require("../config/env");
-const Message = require('../models/Message');
+const Conversation = require("../models/Conversation");
 
 const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
+  publicKey: env.IMAGEKIT_PUBLIC_KEY,
+  privateKey: env.IMAGEKIT_PRIVATE_KEY,
+  urlEndpoint: env.IMAGEKIT_URL_ENDPOINT,
 });
 
 const getMyProfile = async (req, res) => {
@@ -38,39 +38,22 @@ const getAllUsers = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const users = await User.find({ _id: { $ne: userId } }).select(
-      "_id name avatar"
-    );
+    const conversations = await Conversation.find({
+      participants: userId,
+    });
 
-    const usersWithMessages = await Promise.all(
-      users.map(async (user) => {
-        const lastMessage = await Message.findOne({
-          $or: [
-            { sender: userId, receiver: user._id },
-            { sender: user._id, receiver: userId },
-          ],
-        })
-          .sort({ createdAt: -1 })
-          .lean();
+    const conversationUserIds = new Set();
+    conversations.forEach((conv) => {
+      conv.participants.forEach((p) => {
+        if (p.toString() !== userId) conversationUserIds.add(p.toString());
+      });
+    });
 
-        const unreadCount = await Message.countDocuments({
-          sender: user._id,
-          receiver: userId,
-          read: false,
-        });
+    const users = await User.find({
+      _id: { $nin: [...conversationUserIds, userId] },
+    }).select("_id name avatar");
 
-        return {
-          _id: user._id,
-          name: user.name,
-          avatar: user.avatar,
-          lastMessage: lastMessage ? lastMessage.text : "Start Chatting",
-          timestamp: lastMessage ? lastMessage.createdAt : null,
-          unreadCount,
-        };
-      })
-    );
-
-    res.status(200).json(usersWithMessages);
+    res.status(200).json(users);
   } catch (error) {
     res.status(500).json({
       message: "Error fetching users",
@@ -81,7 +64,7 @@ const getAllUsers = async (req, res) => {
 
 const updateProfilePhoto = async (req, res) => {
   try {
-     const userId = req.user.id;
+    const userId = req.user.id;
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const uploadResponse = await imagekit.upload({
@@ -94,7 +77,9 @@ const updateProfilePhoto = async (req, res) => {
       userId,
       { avatar: uploadResponse.url },
       { new: true }
-    ).select("-password -otp -resetToken -isVerified  -createdAt -updatedAt -resetTokenExpiry");
+    ).select(
+      "-password -otp -resetToken -isVerified  -createdAt -updatedAt -resetTokenExpiry"
+    );
 
     if (!updateData) {
       return res.status(404).json({ message: "User not found" });
@@ -102,7 +87,7 @@ const updateProfilePhoto = async (req, res) => {
 
     res.status(200).json({
       message: "Upload successful",
-      updateData
+      updateData,
     });
   } catch (error) {
     res.status(500).json({ message: "Upload failed", error: error.message });
